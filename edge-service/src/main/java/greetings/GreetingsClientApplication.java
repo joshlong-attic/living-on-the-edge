@@ -18,6 +18,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.Ordered;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.config.annotation.web.configuration.EnableOAuth2Client;
@@ -28,6 +30,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestTemplate;
 
 import javax.servlet.http.HttpServletResponse;
 import java.util.Map;
@@ -127,15 +130,28 @@ class FeignConfiguration {
 class GreetingsClientApiGateway {
 
     private final GreetingsClient greetingsClient;
+    private final RestTemplate restTemplate;
 
     @Autowired
-    GreetingsClientApiGateway(GreetingsClient greetingsClient) {
+    GreetingsClientApiGateway(GreetingsClient greetingsClient, RestTemplate restTemplate) {
         this.greetingsClient = greetingsClient;
+        this.restTemplate = restTemplate;
     }
 
-    @RequestMapping(method = RequestMethod.GET, value = "/hi/{name}")
-    Map<String, String> read(@PathVariable String name) {
+    @RequestMapping(method = RequestMethod.GET, value = "/feign/{name}")
+    Map<String, String> feign(@PathVariable String name) {
         return this.greetingsClient.greet(name);
+    }
+
+    @RequestMapping(method = RequestMethod.GET, value = "/resttemplate/{name}")
+    Map<String, String> restTemplate(@PathVariable String name) {
+
+        ParameterizedTypeReference<Map<String, String>> type =
+            new ParameterizedTypeReference<Map<String, String>>() { };
+
+        return this.restTemplate.exchange(
+                "http://greetings-service/greet/{name}", HttpMethod.GET, null, type , name)
+                .getBody();
     }
 }
 

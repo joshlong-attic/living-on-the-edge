@@ -11,6 +11,7 @@ import org.springframework.security.oauth2.config.annotation.web.configuration.E
 import org.springframework.security.oauth2.config.annotation.web.configuration.EnableResourceServer;
 import org.springframework.web.bind.annotation.*;
 
+import java.security.Principal;
 import java.util.Collections;
 import java.util.Map;
 
@@ -39,8 +40,9 @@ class GreetingsRestController {
 
     // <2>
     @RequestMapping
-    Map<String, String> hi(@PathVariable String name) {
-        log.info("responded to a direct request." );
+    Map<String, String> hi(@PathVariable String name, Principal p) {
+        log.info("responded to a direct request.");
+        log.info(debugPrincipal(p));
         return this.doHi(name);
     }
 
@@ -50,12 +52,18 @@ class GreetingsRestController {
                            @RequestHeader("x-forwarded-proto") String proto,
                            @RequestHeader("x-forwarded-host") String host,
                            @RequestHeader("x-forwarded-port") int port,
-                           @RequestHeader("x-forwarded-prefix") String prefix) {
+                           @RequestHeader("x-forwarded-prefix") String prefix,
+                           Principal p) {
 
-        log.info(String.format("responded to a proxied request from %s://%s:%s " +
+        log.info(String.format("responded to a proxied request debugPrincipal %s://%s:%s " +
                 "with prefix %s for service %s.", proto, host, port, prefix, forwardedFor));
+        log.info(debugPrincipal(p));
 
         return this.doHi(name);
+    }
+
+    private String debugPrincipal(Principal p) {
+        return p == null ? "no principal." : String.format("principal: %s.", p.getName());
     }
 
     private Map<String, String> doHi(String name) {
