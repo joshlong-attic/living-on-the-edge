@@ -17,6 +17,7 @@ import org.springframework.security.oauth2.config.annotation.web.configuration.E
 
 // todo: https://jfconavarrete.wordpress.com/2014/09/15/make-spring-security-context-available-inside-a-hystrix-command/
 
+// this works because we added @EnableOAuth2Client to the the services
 @Configuration
 @Profile("secure")
 @ConditionalOnWebApplication
@@ -30,7 +31,6 @@ public class TokenRelayAutoConfiguration {
         return factory.getUserInfoRestTemplate();
     }
 
-    // this works because we added @EnableOAuth2Client to the the services
     @Configuration
     @ConditionalOnClass(RequestInterceptor.class)
     public static class FeignAutoConfiguration {

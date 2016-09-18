@@ -20,7 +20,7 @@ public class ClientConfiguration {
                             client.getScopes(), client.getAuthorizedGrantTypes(), client.getAuthorities());
                     details.setClientSecret(client.getSecret());
                     details.setAutoApproveScopes(Arrays.asList(client.getAutoApproveScopes().split(",")));
-                    details.setRegisteredRedirectUri(Collections.singleton("http://localhost:8080"));
+                    details.setRegisteredRedirectUri(Collections.singleton("http://localhost:8082"));
                     return details;
                 })
                 .orElseThrow(() -> new ClientRegistrationException(String.format("no client %s registered", clientId)));

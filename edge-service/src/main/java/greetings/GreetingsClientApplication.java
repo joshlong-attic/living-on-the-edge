@@ -9,9 +9,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.autoconfigure.security.oauth2.resource.UserInfoRestTemplateFactory;
+import org.springframework.boot.autoconfigure.security.oauth2.client.EnableOAuth2Sso;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
-import org.springframework.cloud.client.loadbalancer.LoadBalanced;
 import org.springframework.cloud.netflix.feign.EnableFeignClients;
 import org.springframework.cloud.netflix.feign.FeignClient;
 import org.springframework.cloud.netflix.zuul.EnableZuulProxy;
@@ -24,10 +23,12 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.security.oauth2.client.OAuth2RestTemplate;
-import org.springframework.security.oauth2.config.annotation.web.configuration.EnableOAuth2Client;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
 import org.springframework.security.oauth2.config.annotation.web.configuration.EnableResourceServer;
-import org.springframework.stereotype.Component;
+import org.springframework.security.oauth2.config.annotation.web.configuration.ResourceServerConfigurerAdapter;
+import org.springframework.security.oauth2.config.annotation.web.configurers.ResourceServerSecurityConfigurer;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.util.ReflectionUtils;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -36,6 +37,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 
 import javax.servlet.http.HttpServletResponse;
+import java.security.Principal;
 import java.util.Map;
 
 //import org.springframework.security.oauth2.client.OAuth2ClientContext;
@@ -51,15 +53,46 @@ public class GreetingsClientApplication {
     }
 }
 
+
 @Profile("secure")
 @Configuration
 @EnableResourceServer
-@EnableOAuth2Client
-class OAuthResourceConfiguration {
+class ResourceConfiguration extends ResourceServerConfigurerAdapter {
+
+    @Override
+    public void configure(HttpSecurity http) throws Exception {
+        http.antMatcher("/api/**").authorizeRequests().anyRequest().authenticated();
+    }
 }
 
-@EnableZuulProxy
+
+@Profile("secure")
 @Configuration
+@EnableOAuth2Sso
+class SsoConfiguration extends WebSecurityConfigurerAdapter {
+
+    @RestController
+    public static class PrincipalRestController {
+
+        @RequestMapping("/user")
+        public Principal user(Principal principal) {
+            return principal;
+        }
+    }
+
+    @Override
+    protected void configure(HttpSecurity http) throws Exception {
+        // @formatter:off
+        http.antMatcher("/**").authorizeRequests().antMatchers("/", "/login**", "/webjars/**").permitAll().anyRequest()
+                .authenticated().and().logout().logoutSuccessUrl("/").permitAll().and().csrf()
+                .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse());
+        // @formatter:on
+    }
+}
+
+
+@Configuration
+@EnableZuulProxy
 class ZuulConfiguration {
 
     @Bean
@@ -73,7 +106,7 @@ class ZuulConfiguration {
     }
 }
 
-@Component
+//TODO @Component
 class ThrottlingZuulFilter extends ZuulFilter {
 
     private final HttpStatus tooManyRequests = HttpStatus.TOO_MANY_REQUESTS;
@@ -111,11 +144,10 @@ class ThrottlingZuulFilter extends ZuulFilter {
                 response.getWriter().append(this.tooManyRequests.getReasonPhrase());
                 currentContext.setSendZuulResponse(false);
                 throw new ZuulException(this.tooManyRequests.getReasonPhrase(),
-                    this.tooManyRequests.value(),
-                    this.tooManyRequests.getReasonPhrase());
+                        this.tooManyRequests.value(),
+                        this.tooManyRequests.getReasonPhrase());
             }
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             ReflectionUtils.rethrowRuntimeException(e);
         }
         return null;
@@ -129,6 +161,7 @@ class FeignConfiguration {
 }
 
 @RestController
+@RequestMapping ("/api")
 class GreetingsClientApiGateway {
 
     private final GreetingsClient greetingsClient;
@@ -149,10 +182,11 @@ class GreetingsClientApiGateway {
     Map<String, String> restTemplate(@PathVariable String name) {
 
         ParameterizedTypeReference<Map<String, String>> type =
-            new ParameterizedTypeReference<Map<String, String>>() { };
+                new ParameterizedTypeReference<Map<String, String>>() {
+                };
 
         return this.restTemplate.exchange(
-                "http://greetings-service/greet/{name}", HttpMethod.GET, null, type , name)
+                "http://greetings-service/greet/{name}", HttpMethod.GET, null, type, name)
                 .getBody();
     }
 }
