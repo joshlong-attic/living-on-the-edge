@@ -54,7 +54,6 @@ public class GreetingsClientApplication {
 @EnableResourceServer
 @EnableOAuth2Client
 class OAuthResourceConfiguration {
-
 }
 
 @EnableZuulProxy
