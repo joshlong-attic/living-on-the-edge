@@ -9,7 +9,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.security.oauth2.resource.UserInfoRestTemplateFactory;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
+import org.springframework.cloud.client.loadbalancer.LoadBalanced;
 import org.springframework.cloud.netflix.feign.EnableFeignClients;
 import org.springframework.cloud.netflix.feign.FeignClient;
 import org.springframework.cloud.netflix.zuul.EnableZuulProxy;
@@ -22,6 +24,7 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.security.oauth2.client.OAuth2RestTemplate;
 import org.springframework.security.oauth2.config.annotation.web.configuration.EnableOAuth2Client;
 import org.springframework.security.oauth2.config.annotation.web.configuration.EnableResourceServer;
 import org.springframework.stereotype.Component;
@@ -38,7 +41,6 @@ import java.util.Map;
 //import org.springframework.security.oauth2.client.OAuth2ClientContext;
 //import org.springframework.security.oauth2.config.annotation.web.configuration.EnableResourceServer;
 // https://jfconavarrete.wordpress.com/2014/09/15/make-spring-security-context-available-inside-a-hystrix-command/
-
 
 @EnableDiscoveryClient
 @SpringBootApplication
@@ -109,10 +111,11 @@ class ThrottlingZuulFilter extends ZuulFilter {
                 response.getWriter().append(this.tooManyRequests.getReasonPhrase());
                 currentContext.setSendZuulResponse(false);
                 throw new ZuulException(this.tooManyRequests.getReasonPhrase(),
-                        this.tooManyRequests.value(),
-                        this.tooManyRequests.getReasonPhrase());
+                    this.tooManyRequests.value(),
+                    this.tooManyRequests.getReasonPhrase());
             }
-        } catch (Exception e) {
+        }
+        catch (Exception e) {
             ReflectionUtils.rethrowRuntimeException(e);
         }
         return null;
