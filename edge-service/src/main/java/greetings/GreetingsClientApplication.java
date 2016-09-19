@@ -29,6 +29,7 @@ import org.springframework.security.oauth2.config.annotation.web.configuration.E
 import org.springframework.security.oauth2.config.annotation.web.configuration.ResourceServerConfigurerAdapter;
 import org.springframework.security.oauth2.config.annotation.web.configurers.ResourceServerSecurityConfigurer;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.stereotype.Component;
 import org.springframework.util.ReflectionUtils;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -106,7 +107,10 @@ class ZuulConfiguration {
     }
 }
 
-//TODO @Component
+
+/// TODO how does Zuul figure into all of this?
+@Profile("throttled")
+@Component
 class ThrottlingZuulFilter extends ZuulFilter {
 
     private final HttpStatus tooManyRequests = HttpStatus.TOO_MANY_REQUESTS;
