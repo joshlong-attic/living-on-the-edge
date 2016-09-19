@@ -7,23 +7,25 @@
     <meta name="description" content=""/>
     <meta name="viewport" content="width=device-width"/>
     <base href="/"/>
-    <!--<link rel="stylesheet" type="text/css" href="/webjars/bootstrap/css/bootstrap.min.css" />-->
+    <!--
+    <link rel="stylesheet" type="text/css" href="/webjars/bootstrap/css/bootstrap.min.css" />
+    -->
     <script type="text/javascript" src="/webjars/jquery/jquery.min.js"></script>
     <script type="text/javascript"
             src="/webjars/bootstrap/js/bootstrap.min.js"></script>
 </head>
 <body ng-app="app" ng-controller="home as home">
 
-<h1>Login</h1>
+
 
 <div class="container" ng-show="!home.authenticated">
     <a href="/login">Login </a>
 </div>
 
 <div class="container" ng-show="home.authenticated">
-    Logged in as: <span ng-bind="home.user"></span>! <br/>
-    Token: <span ng-bind="home.token"></span> <br/>
-    Greeting: <span ng-bind="home.greeting"></span> <br/>
+    Logged in as: <b><span ng-bind="home.user"></span></b> <br/>
+    Token: <b><span ng-bind="home.token"></span> </b><br/>
+    Greeting: <b><span ng-bind="home.greeting"></span></b> <br/>
 </div>
 <script type="text/javascript" src="/webjars/angularjs/angular.min.js"></script>
 <script type="text/javascript">
@@ -59,7 +61,7 @@
             self.token = oauth.token;
             self.authenticated = true;
 
-            $http.get('/api/feign/World')
+            $http.get('/api/feign/' + window.prompt('who would you like to greet?'))
                     .success(function (greetingData) {
                         self.greeting = greetingData.greeting;
                     })
