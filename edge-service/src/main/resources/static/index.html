@@ -13,15 +13,17 @@
             src="/webjars/bootstrap/js/bootstrap.min.js"></script>
 </head>
 <body ng-app="app" ng-controller="home as home">
+
 <h1>Login</h1>
+
 <div class="container" ng-show="!home.authenticated">
     <a href="/login">Login </a>
 </div>
+
 <div class="container" ng-show="home.authenticated">
     Logged in as: <span ng-bind="home.user"></span>! <br/>
     Token: <span ng-bind="home.token"></span> <br/>
     Greeting: <span ng-bind="home.greeting"></span> <br/>
-
 </div>
 <script type="text/javascript" src="/webjars/angularjs/angular.min.js"></script>
 <script type="text/javascript">
@@ -47,8 +49,11 @@
     }]);
 
     app.controller("home", function ($http, $rootScope, oauth) {
+
         var self = this;
+
         self.authenticated = false;
+
         $rootScope.$on('auth-event', function (evt, ctx) {
             self.user = oauth.details.name;
             self.token = oauth.token;
