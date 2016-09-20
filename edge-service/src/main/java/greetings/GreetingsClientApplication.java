@@ -27,7 +27,6 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
 import org.springframework.security.oauth2.config.annotation.web.configuration.EnableResourceServer;
 import org.springframework.security.oauth2.config.annotation.web.configuration.ResourceServerConfigurerAdapter;
-import org.springframework.security.oauth2.config.annotation.web.configurers.ResourceServerSecurityConfigurer;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.stereotype.Component;
 import org.springframework.util.ReflectionUtils;
@@ -91,6 +90,59 @@ class SsoConfiguration extends WebSecurityConfigurerAdapter {
     }
 }
 
+/**
+ * TODO this {@link ZuulFilter} contributes CORS filters that expose
+ * all the proxied endpoints to browser-based clients that live
+ * in a secure sandbox.
+ *
+ * Now, we don't even have to serve the JavaScript in a single node!
+ */
+@Component
+class CorsZuulFilter extends ZuulFilter {
+
+    @Override
+    public String filterType() {
+        return "pre";
+    }
+
+    @Override
+    public int filterOrder() {
+        return Ordered.HIGHEST_PRECEDENCE;
+    }
+
+    @Override
+    public boolean shouldFilter() {
+        return true;
+    }
+
+    @Override
+    public Object run() {
+        RequestContext currentContext = RequestContext.getCurrentContext();
+        HttpServletResponse response = currentContext.getResponse();
+        // when the JavaScript client calls this endpoint
+        // theyll first send an OPTIONS request.
+        // *then* theyll make the request if the OPTIONS request is OK. So,
+        // configure this to detect the OPTIONS request and respond w/ the headers
+        // that would allow the client to invoke it
+        // for more, see https://developer.mozilla.org/en-US/docs/Web/HTTP/Access_control_CORS
+        /**
+         * the request will have the following:
+         * Origin: http://foo.example
+         * Access-Control-Request-Method: POST
+         * Access-Control-Request-Headers: X-PINGOTHER, Content-Type
+         *
+         * so the response should have:
+         * Server: Apache/2.0.61 (Unix)
+         * Access-Control-Allow-Origin: http://foo.example
+         * Access-Control-Allow-Methods: POST, GET, OPTIONS
+         * Access-Control-Allow-Headers: X-PINGOTHER, Content-Type
+         * Access-Control-Max-Age: 86400
+         * Vary: Accept-Encoding, Origin
+         * ...
+         */
+        return null;
+    }
+}
 
 @Configuration
 @EnableZuulProxy
