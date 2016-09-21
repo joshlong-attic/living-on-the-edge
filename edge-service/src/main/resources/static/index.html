@@ -65,6 +65,7 @@
             var name = window.prompt('who would you like to greet?');
 
 
+            // Zuul routes
             $http.get('/greetings-service/greet/' + name)
                     .success(function (greetingData) {
                         self.greetingFromZuulRoute = greetingData.greeting;
@@ -73,7 +74,7 @@
                         console.log('oops!' + JSON.stringify(e));
                     });
 
-
+            // route through API gateway
             $http.get('/api/feign/' + name)
                     .success(function (greetingData) {
                         self.greetingFromEdgeService = greetingData.greeting;

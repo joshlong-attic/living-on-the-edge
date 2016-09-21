@@ -29,6 +29,11 @@
         <module>greetings-service</module>
         <module>edge-service</module>
 
+        <!--
+            html5 client
+        -->
+        <module>html5-client</module>
+
 
         <!-- <module>auth-service</module>
         <module>social-auth-service</module>

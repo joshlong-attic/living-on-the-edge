@@ -6,10 +6,12 @@ import com.netflix.zuul.context.RequestContext;
 import com.netflix.zuul.exception.ZuulException;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.security.oauth2.client.EnableOAuth2Sso;
+import org.springframework.cloud.client.discovery.DiscoveryClient;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 import org.springframework.cloud.netflix.feign.EnableFeignClients;
 import org.springframework.cloud.netflix.feign.FeignClient;
@@ -20,6 +22,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.Ordered;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -30,13 +33,18 @@ import org.springframework.security.oauth2.config.annotation.web.configuration.R
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.stereotype.Component;
 import org.springframework.util.ReflectionUtils;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 
+import javax.servlet.*;
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.net.URI;
 import java.security.Principal;
 import java.util.Map;
 
@@ -94,55 +102,64 @@ class SsoConfiguration extends WebSecurityConfigurerAdapter {
  * TODO this {@link ZuulFilter} contributes CORS filters that expose
  * all the proxied endpoints to browser-based clients that live
  * in a secure sandbox.
- *
+ * <p>
  * Now, we don't even have to serve the JavaScript in a single node!
  */
 @Component
-class CorsZuulFilter extends ZuulFilter {
+class CorsZuulFilter implements Filter {
 
-    @Override
-    public String filterType() {
-        return "pre";
+    public static final String DEFAULT_CLIENT_HEADER = "X-Client-Id";
+
+    private final DiscoveryClient discoveryClient;
+
+    private String clientIdHeaderName;
+
+    @Autowired
+    public CorsZuulFilter(DiscoveryClient discoveryClient,
+                          @Value("${cors-proxy.client-id-header:" + DEFAULT_CLIENT_HEADER + "}") String clientIdHeaderName) {
+        this.clientIdHeaderName = clientIdHeaderName;
+        this.discoveryClient = discoveryClient;
+    }
+
+    private boolean isClientAllowed(String origin) {
+        if (StringUtils.hasText(origin)) {
+            URI originUri = URI.create(origin);
+            String match = originUri.getHost() + ':' + originUri.getPort();
+            return discoveryClient.getServices().stream()
+                    .anyMatch(serviceId ->
+                            this.discoveryClient.getInstances(serviceId)
+                                    .stream()
+                                    .map(si -> si.getHost() + ':' + si.getPort())
+                                    .anyMatch(hp -> hp.equalsIgnoreCase(match)));
+        }
+        return false;
     }
 
     @Override
-    public int filterOrder() {
-        return Ordered.HIGHEST_PRECEDENCE;
+    public void init(FilterConfig filterConfig) throws ServletException {
+
     }
 
     @Override
-    public boolean shouldFilter() {
-        return true;
+    public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain) throws IOException, ServletException {
+        HttpServletResponse response = HttpServletResponse.class.cast(res);
+        HttpServletRequest request = HttpServletRequest.class.cast(req);
+        String originHeaderValue = request.getHeader(HttpHeaders.ORIGIN);
+        boolean clientAllowed = isClientAllowed(originHeaderValue);
+        if (clientAllowed) {
+            response.setHeader(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, originHeaderValue);
+            response.setHeader(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS, this.clientIdHeaderName);
+            response.setHeader(HttpHeaders.ACCESS_CONTROL_MAX_AGE, Integer.toString(0));
+        }
+        chain.doFilter(req, res);
     }
 
     @Override
-    public Object run() {
-        RequestContext currentContext = RequestContext.getCurrentContext();
-        HttpServletResponse response = currentContext.getResponse();
-        // when the JavaScript client calls this endpoint
-        // theyll first send an OPTIONS request.
-        // *then* theyll make the request if the OPTIONS request is OK. So,
-        // configure this to detect the OPTIONS request and respond w/ the headers
-        // that would allow the client to invoke it
-        // for more, see https://developer.mozilla.org/en-US/docs/Web/HTTP/Access_control_CORS
-        /**
-         * the request will have the following:
-         * Origin: http://foo.example
-         * Access-Control-Request-Method: POST
-         * Access-Control-Request-Headers: X-PINGOTHER, Content-Type
-         *
-         * so the response should have:
-         * Server: Apache/2.0.61 (Unix)
-         * Access-Control-Allow-Origin: http://foo.example
-         * Access-Control-Allow-Methods: POST, GET, OPTIONS
-         * Access-Control-Allow-Headers: X-PINGOTHER, Content-Type
-         * Access-Control-Max-Age: 86400
-         * Vary: Accept-Encoding, Origin
-         * ...
-         */
-        return null;
+    public void destroy() {
+
     }
 }
+
 
 @Configuration
 @EnableZuulProxy
@@ -160,7 +177,6 @@ class ZuulConfiguration {
 }
 
 
-/// TODO how does Zuul figure into all of this?
 @Profile("throttled")
 @Component
 class ThrottlingZuulFilter extends ZuulFilter {
@@ -210,6 +226,7 @@ class ThrottlingZuulFilter extends ZuulFilter {
     }
 }
 
+
 @Configuration
 @EnableFeignClients
 class FeignConfiguration {
@@ -217,7 +234,7 @@ class FeignConfiguration {
 }
 
 @RestController
-@RequestMapping ("/api")
+@RequestMapping("/api")
 class GreetingsClientApiGateway {
 
     private final GreetingsClient greetingsClient;
