@@ -51,7 +51,7 @@ import java.util.Map;
 //import org.springframework.security.oauth2.client.OAuth2ClientContext;
 //import org.springframework.security.oauth2.config.annotation.web.configuration.EnableResourceServer;
 // https://jfconavarrete.wordpress.com/2014/09/15/make-spring-security-context-available-inside-a-hystrix-command/
-
+@EnableZuulProxy
 @EnableDiscoveryClient
 @SpringBootApplication
 public class GreetingsClientApplication {
@@ -72,7 +72,6 @@ class ResourceConfiguration extends ResourceServerConfigurerAdapter {
         http.antMatcher("/api/**").authorizeRequests().anyRequest().authenticated();
     }
 }
-
 
 @Profile("secure")
 @Configuration
@@ -98,13 +97,9 @@ class SsoConfiguration extends WebSecurityConfigurerAdapter {
     }
 }
 
-/**
- * TODO this {@link ZuulFilter} contributes CORS filters that expose
- * all the proxied endpoints to browser-based clients that live
- * in a secure sandbox.
- * <p>
- * Now, we don't even have to serve the JavaScript in a single node!
- */
+// we use a servlet Filter because right now Spring Cloud doesn't support
+// using other HTTP verbs in the ZuulController (only GET, POST, DELETE, for some reason)
+// and we need OPTIONS
 @Component
 class CorsZuulFilter implements Filter {
 
@@ -137,7 +132,6 @@ class CorsZuulFilter implements Filter {
 
     @Override
     public void init(FilterConfig filterConfig) throws ServletException {
-
     }
 
     @Override
@@ -210,11 +204,15 @@ class ThrottlingZuulFilter extends ZuulFilter {
         try {
             RequestContext currentContext = RequestContext.getCurrentContext();
             HttpServletResponse response = currentContext.getResponse();
+
             if (!rateLimiter.tryAcquire()) {
+
                 response.setContentType(MediaType.TEXT_PLAIN_VALUE);
                 response.setStatus(this.tooManyRequests.value());
                 response.getWriter().append(this.tooManyRequests.getReasonPhrase());
+
                 currentContext.setSendZuulResponse(false);
+
                 throw new ZuulException(this.tooManyRequests.getReasonPhrase(),
                         this.tooManyRequests.value(),
                         this.tooManyRequests.getReasonPhrase());
