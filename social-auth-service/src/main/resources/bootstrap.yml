@@ -1,11 +1,11 @@
-security:
-  oauth2:
-    client:
-      client-id: html5
-      client-secret: secret
-      scope: read,write
-      auto-approve-scopes: '.*'
-
+#security:
+#  oauth2:
+#    client:
+#      client-id: html5
+#      client-secret: secret
+#      scope: read,write
+#      auto-approve-scopes: '.*'
+#
 
 
 facebook:

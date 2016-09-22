@@ -39,14 +39,14 @@ public class AuthServiceApplication {
 
 @Configuration
 @EnableAuthorizationServer
-class AuthorizationServer extends AuthorizationServerConfigurerAdapter {
+class AuthorizationServerConfiguration extends AuthorizationServerConfigurerAdapter {
 
     private final AuthenticationManager authenticationManager;
 
     private final ClientDetailsService clientDetailsService;
 
     @Autowired
-    public AuthorizationServer(AuthenticationManager authenticationManager,
+    public AuthorizationServerConfiguration(AuthenticationManager authenticationManager,
                                ClientDetailsService clientDetailsService) {
         this.authenticationManager = authenticationManager;
         this.clientDetailsService = clientDetailsService;
