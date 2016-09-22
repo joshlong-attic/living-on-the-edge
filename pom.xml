@@ -26,6 +26,7 @@
             actors in this chapter
         -->
         <module>auth-service</module>
+        <module>social-auth-service</module>
         <module>greetings-service</module>
         <module>edge-service</module>
 

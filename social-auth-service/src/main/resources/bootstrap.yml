@@ -1,0 +1,43 @@
+security:
+  oauth2:
+    client:
+      client-id: html5
+      client-secret: secret
+      scope: read,write
+      auto-approve-scopes: '.*'
+
+
+
+facebook:
+  client:
+    clientId: 233668646673605
+    clientSecret: 33b17e044ee6a4fa383f46ec6e28ea1d
+    accessTokenUri: https://graph.facebook.com/oauth/access_token
+    userAuthorizationUri: https://www.facebook.com/dialog/oauth
+    tokenName: oauth_token
+    authenticationScheme: query
+    clientAuthenticationScheme: form
+  resource:
+    userInfoUri: https://graph.facebook.com/me
+
+github:
+  client:
+    client-id: 83aea5adb9b172f14260
+    client-secret: 4f03278cbe8b2f3df3b6fbbff0382f7740a6b3ce
+    accessTokenUri: https://github.com/login/oauth/access_token
+    userAuthorizationUri: https://github.com/login/oauth/authorize
+    clientAuthenticationScheme: form
+  resource:
+    userInfoUri: https://api.github.com/user
+
+
+logging:
+  level:
+    org.springframework.security: DEBUG
+
+server:
+  port: ${PORT:9191}
+  context-path: /uaa
+spring:
+  application:
+    name: auth-service

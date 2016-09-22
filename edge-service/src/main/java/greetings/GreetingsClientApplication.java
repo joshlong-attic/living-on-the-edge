@@ -6,13 +6,14 @@ import com.netflix.zuul.context.RequestContext;
 import com.netflix.zuul.exception.ZuulException;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.security.oauth2.client.EnableOAuth2Sso;
+import org.springframework.cloud.client.ServiceInstance;
 import org.springframework.cloud.client.discovery.DiscoveryClient;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
+import org.springframework.cloud.client.discovery.event.HeartbeatEvent;
 import org.springframework.cloud.netflix.feign.EnableFeignClients;
 import org.springframework.cloud.netflix.feign.FeignClient;
 import org.springframework.cloud.netflix.zuul.EnableZuulProxy;
@@ -20,6 +21,7 @@ import org.springframework.cloud.netflix.zuul.filters.RouteLocator;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
+import org.springframework.context.event.EventListener;
 import org.springframework.core.Ordered;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
@@ -46,7 +48,9 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.net.URI;
 import java.security.Principal;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 //import org.springframework.security.oauth2.client.OAuth2ClientContext;
 //import org.springframework.security.oauth2.config.annotation.web.configuration.EnableResourceServer;
@@ -100,38 +104,42 @@ class SsoConfiguration extends WebSecurityConfigurerAdapter {
 // we use a servlet Filter because right now Spring Cloud doesn't support
 // using other HTTP verbs in the ZuulController (only GET, POST, DELETE, for some reason)
 // and we need OPTIONS
+@Profile("cors")
 @Component
 class CorsZuulFilter implements Filter {
 
-    public static final String DEFAULT_CLIENT_HEADER = "X-Client-Id";
+    private final Map<String, List<ServiceInstance>> catalog = new ConcurrentHashMap<>();
 
     private final DiscoveryClient discoveryClient;
 
-    private String clientIdHeaderName;
-
     @Autowired
-    public CorsZuulFilter(DiscoveryClient discoveryClient,
-                          @Value("${cors-proxy.client-id-header:" + DEFAULT_CLIENT_HEADER + "}") String clientIdHeaderName) {
-        this.clientIdHeaderName = clientIdHeaderName;
+    public CorsZuulFilter(DiscoveryClient discoveryClient) {
         this.discoveryClient = discoveryClient;
+        this.refreshCatalog();
     }
 
     private boolean isClientAllowed(String origin) {
         if (StringUtils.hasText(origin)) {
             URI originUri = URI.create(origin);
             String match = originUri.getHost() + ':' + originUri.getPort();
-            return discoveryClient.getServices().stream()
-                    .anyMatch(serviceId ->
-                            this.discoveryClient.getInstances(serviceId)
-                                    .stream()
-                                    .map(si -> si.getHost() + ':' + si.getPort())
-                                    .anyMatch(hp -> hp.equalsIgnoreCase(match)));
+            return this.catalog.keySet().stream().anyMatch(
+                    serviceId -> this.catalog.get(serviceId)
+                        .stream()
+                        .map(si -> si.getHost() + ':' + si.getPort())
+                        .anyMatch(hp -> hp.equalsIgnoreCase(match)));
         }
         return false;
     }
 
-    @Override
-    public void init(FilterConfig filterConfig) throws ServletException {
+    @EventListener(HeartbeatEvent.class)
+    public void onHeartbeatEvent(HeartbeatEvent event) {
+        this.refreshCatalog();
+    }
+
+    // we don't want to constantly hit the registry, so proactively cache updates
+    private void refreshCatalog() {
+        discoveryClient.getServices()
+                .forEach(svc -> this.catalog.put(svc, this.discoveryClient.getInstances(svc)));
     }
 
     @Override
@@ -142,18 +150,18 @@ class CorsZuulFilter implements Filter {
         boolean clientAllowed = isClientAllowed(originHeaderValue);
         if (clientAllowed) {
             response.setHeader(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, originHeaderValue);
-            response.setHeader(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS, this.clientIdHeaderName);
-            response.setHeader(HttpHeaders.ACCESS_CONTROL_MAX_AGE, Integer.toString(0));
         }
         chain.doFilter(req, res);
     }
 
     @Override
-    public void destroy() {
+    public void init(FilterConfig filterConfig) throws ServletException {
+    }
 
+    @Override
+    public void destroy() {
     }
 }
-
 
 @Configuration
 @EnableZuulProxy
